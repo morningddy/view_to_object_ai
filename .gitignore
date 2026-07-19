@@ -1,0 +1,24 @@
+# ===== 运行时产出（不入库）=====
+# 插件自动生成的图片
+AI_Generated_Images/
+
+# 系统临时目录（Blender 渲染底图等）
+*.tmp
+blender_ai_*
+
+# ===== 本地项目记忆（不入库）=====
+.workbuddy/
+
+# ===== Python 缓存 =====
+__pycache__/
+*.pyc
+*.pyo
+
+# ===== 编辑器/系统 =====
+.DS_Store
+Thumbs.db
+*~
+
+# ===== Blender 备份文件 =====
+*.blend1
+*.blend2
