@@ -28,11 +28,11 @@ from bpy.types import Operator, Panel, PropertyGroup
 
 PLATFORM_CHOICES = [
     ("sd_webui", "本地 SD WebUI",  "本地 Stable Diffusion WebUI 服务",  0),
-    ("yunwu",    "云雾AI 中转站",  "云雾AI 等 fal-ai 转发站：输入网站+Token 后获取模型列表",  1),
+    ("api",      "各种 API",       "通用 fal-ai 兼容 API 转发站：输入网站+Token 后获取模型列表",  1),
 ]
 
 SD_WEBUI_DEFAULT_URL = "http://127.0.0.1:7860/sdapi/v1/img2img"
-YUNWU_DEFAULT_URL = "https://yunwu.ai"
+API_DEFAULT_URL = "https://yunwu.ai"
 
 
 def build_api_url_for_model(platform_url, model_id):
@@ -654,11 +654,11 @@ class AI_Generate_Properties(PropertyGroup):
             self.api_url = SD_WEBUI_DEFAULT_URL
         else:
             if "127.0.0.1" in self.api_url or not self.api_url.strip():
-                self.api_url = YUNWU_DEFAULT_URL
+                self.api_url = API_DEFAULT_URL
             if not self.platform_url.strip():
-                self.platform_url = YUNWU_DEFAULT_URL
+                self.platform_url = API_DEFAULT_URL
 
-    platform_url: StringProperty(name="网站地址", default=YUNWU_DEFAULT_URL)
+    platform_url: StringProperty(name="网站地址", default=API_DEFAULT_URL)
     api_url: StringProperty(name="API 完整地址", default=SD_WEBUI_DEFAULT_URL)
     api_token: StringProperty(name="API Token", default="", subtype="PASSWORD")
 
@@ -718,7 +718,7 @@ class AI_Generate_Properties(PropertyGroup):
     denoising_strength: FloatProperty(
         name="重绘强度",
         description="图生图重绘强度。越低越保留镜头布局(0.2≈几乎不变, 1.0≈大幅重绘)。"
-                    "仅 fal / SD WebUI 生效；OpenAI(gpt-image-2) 不支持，靠参考图本身保布局",
+                    "仅 API / SD WebUI 生效；OpenAI(gpt-image-2) 不支持，靠参考图本身保布局",
         default=0.5, min=0.1, max=1.0,
     )
 
