@@ -1,8 +1,6 @@
 # ===== 运行时产出（不入库）=====
 # 插件自动生成的图片
 AI_Generated_Images/
-
-# 系统临时目录（Blender 渲染底图等）
 *.tmp
 blender_ai_*
 
@@ -22,3 +20,15 @@ Thumbs.db
 # ===== Blender 备份文件 =====
 *.blend1
 *.blend2
+
+# ===== 敏感信息（绝不入库）=====
+# 密钥 / Token / 凭证 等一律不进版本库
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+secrets.json
+credentials.json
+*.secret
