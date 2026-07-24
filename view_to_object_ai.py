@@ -146,9 +146,9 @@ def _on_select_image_model(self, context):
     if context is None:
         return
     mid = (self.selected_image_model_id or "").strip()
-    if mid and self.platform_url.strip():
+    if mid and self.image_platform_url.strip():
         # 仅当用户未手动改过 API URL（或 URL 与模型不匹配）时自动填充
-        self.api_url = build_api_url_for_model(self.platform_url, mid, platform=self.platform)
+        self.image_api_url = build_api_url_for_model(self.image_platform_url, mid, platform=self.image_platform)
 
 
 def _on_select_video_model(self, context):
@@ -156,8 +156,8 @@ def _on_select_video_model(self, context):
     if context is None:
         return
     mid = (self.selected_video_model_id or "").strip()
-    if mid and self.platform_url.strip():
-        self.video_api_url = build_video_api_url(self.platform_url, mid)
+    if mid and self.video_platform_url.strip():
+        self.video_api_url = build_video_api_url(self.video_platform_url, mid)
 
 
 def is_image_generation_model(model_id):
@@ -1775,11 +1775,11 @@ class GenerationWorker(threading.Thread):
     def _snapshot_props(props):
         selected_model_id = (props.selected_image_model_id or "").strip()
         return {
-            "platform": props.platform,
-            "platform_url": props.platform_url,
-            "api_url": props.api_url,
+            "platform": props.image_platform,
+            "platform_url": props.image_platform_url,
+            "api_url": props.image_api_url,
             "api_token": props.api_token,
-            "comfyui_workflow_file": props.comfyui_workflow_file,
+            "comfyui_workflow_file": props.image_comfyui_workflow_file,
             "selected_model_id": selected_model_id,
             "image_size": props.computed_size or props.image_size,
             "denoising_strength": props.denoising_strength,
@@ -1908,9 +1908,9 @@ class VideoGenerationWorker(threading.Thread):
             "ref_video_url": props.ref_video_url,
             "use_scene_object_names": props.use_scene_object_names,
             "scene_object_names": props.scene_object_names,
-            "platform": props.platform,
-            "platform_url": props.platform_url,
-            "comfyui_workflow_file": props.comfyui_workflow_file,
+            "platform": props.video_platform,
+            "platform_url": props.video_platform_url,
+            "comfyui_workflow_file": props.video_comfyui_workflow_file,
         }
 
     def _build_prompt(self):
@@ -2095,25 +2095,45 @@ class AI_Generate_VideoModelItem(PropertyGroup):
 
 class AI_Generate_Properties(PropertyGroup):
     """AI 渲染图/视频生成器 - 所有属性集中管理"""
-    # ---------- 平台 / API ----------
+    # ---------- 平台 / API（已拆分为图片/视频两套独立设置） ----------
+    # 旧属性保留，避免已保存的 blend 文件因属性缺失报错；UI 与逻辑已不再使用。
     platform: EnumProperty(
-        name="平台", description="API 平台类型",
+        name="平台(旧)", description="已弃用，仅兼容旧 blend 文件",
         items=PLATFORM_CHOICES, default="api",
     )
     platform_url: StringProperty(
-        name="网站地址", description="API 转发站根地址（不含路径）",
+        name="网站地址(旧)", description="已弃用，仅兼容旧 blend 文件",
         default=API_DEFAULT_URL,
     )
     comfyui_workflow_file: StringProperty(
-        name="ComfyUI 工作流文件", description="从 ComfyUI 导出的 API 格式工作流 JSON 文件（右键→保存(API 格式)）",
+        name="ComfyUI 工作流文件(旧)", description="已弃用，仅兼容旧 blend 文件",
         default="", subtype='FILE_PATH',
     )
     api_url: StringProperty(
-        name="API URL", description="完整 API 接口地址（自动填充，可手动改）",
+        name="API URL(旧)", description="已弃用，仅兼容旧 blend 文件",
         default="",
     )
+
+    # 图片生成独立设置
+    image_platform: EnumProperty(
+        name="图片平台", description="图片生成的 API 平台类型",
+        items=PLATFORM_CHOICES, default="api",
+    )
+    image_platform_url: StringProperty(
+        name="图片网站地址", description="图片生成 API 转发站根地址（不含路径）",
+        default=API_DEFAULT_URL,
+    )
+    image_comfyui_workflow_file: StringProperty(
+        name="图片 ComfyUI 工作流文件", description="图片生成用的 ComfyUI API 格式工作流 JSON",
+        default="", subtype='FILE_PATH',
+    )
+    image_api_url: StringProperty(
+        name="图片 API URL", description="图片生成的完整接口地址（自动填充，可手动改）",
+        default="",
+    )
+
     api_token: StringProperty(
-        name="API Token", description="API 密钥 / Bearer Token",
+        name="API Token", description="API 密钥 / Bearer Token（图片/视频共享同一 Token）",
         default="", subtype='PASSWORD',
     )
 
@@ -2145,6 +2165,19 @@ class AI_Generate_Properties(PropertyGroup):
     )
     available_video_models: CollectionProperty(
         name="可用视频模型列表", type=AI_Generate_VideoModelItem,
+    )
+    # 视频生成独立设置
+    video_platform: EnumProperty(
+        name="视频平台", description="视频生成的 API 平台类型",
+        items=PLATFORM_CHOICES, default="api",
+    )
+    video_platform_url: StringProperty(
+        name="视频网站地址", description="视频生成 API 转发站根地址（不含路径）",
+        default=API_DEFAULT_URL,
+    )
+    video_comfyui_workflow_file: StringProperty(
+        name="视频 ComfyUI 工作流文件", description="视频生成用的 ComfyUI API 格式工作流 JSON",
+        default="", subtype='FILE_PATH',
     )
     video_api_url: StringProperty(
         name="视频 API URL", description="视频生成的完整接口地址（自动/手动）",
@@ -2374,17 +2407,17 @@ class OBJECT_OT_AI_Fetch_Models(Operator):
 
     def execute(self, context):
         props = context.scene.ai_gen_props
-        if not props.platform_url.strip():
-            self.report({'ERROR'}, "请先填写网站地址")
+        if not props.image_platform_url.strip():
+            self.report({'ERROR'}, "请先填写图片网站地址")
             return {'CANCELLED'}
-        if props.platform != "comfyui" and not props.api_token.strip():
+        if props.image_platform != "comfyui" and not props.api_token.strip():
             self.report({'ERROR'}, "请先填写 API Token")
             return {'CANCELLED'}
 
-        self.report({'INFO'}, "正在从 " + props.platform_url + " 获取模型列表...")
+        self.report({'INFO'}, "正在从 " + props.image_platform_url + " 获取图片模型列表...")
         props.models_fetch_status = "拉取中..."
 
-        models, err = fetch_models_from_api(props.platform_url, props.api_token, platform=props.platform)
+        models, err = fetch_models_from_api(props.image_platform_url, props.api_token, platform=props.image_platform)
         if err:
             self.report({'ERROR'}, "获取失败: " + err)
             props.models_fetch_status = "X " + err[:60]
@@ -2430,7 +2463,7 @@ class OBJECT_OT_AI_Apply_Selected_Model(Operator):
         props = context.scene.ai_gen_props
         if 0 <= props.selected_model_index < len(props.available_models):
             item = props.available_models[props.selected_model_index]
-            props.api_url = build_api_url_for_model(props.platform_url, item.model_id, platform=props.platform)
+            props.image_api_url = build_api_url_for_model(props.image_platform_url, item.model_id, platform=props.image_platform)
             props.selected_image_model_id = item.model_id
             if item.model_type != "image":
                 self.report({'WARNING'}, item.model_id + " 看起来不是图生图模型")
@@ -2457,13 +2490,13 @@ class OBJECT_OT_AI_Generate_Async(Operator):
         if props.is_generating:
             self.report({'WARNING'}, "已有生成任务进行中")
             return {'CANCELLED'}
-        if props.platform == "comfyui":
-            if not props.comfyui_workflow_file.strip() or not os.path.exists(props.comfyui_workflow_file):
-                self.report({'ERROR'}, "请先选择 ComfyUI 工作流 JSON 文件（右键工作流→保存(API 格式)）")
+        if props.image_platform == "comfyui":
+            if not props.image_comfyui_workflow_file.strip() or not os.path.exists(props.image_comfyui_workflow_file):
+                self.report({'ERROR'}, "请先选择图片 ComfyUI 工作流 JSON 文件（右键工作流→保存(API 格式)）")
                 return {'CANCELLED'}
         else:
-            if not props.api_url.strip():
-                self.report({'ERROR'}, "API 地址不能为空")
+            if not props.image_api_url.strip():
+                self.report({'ERROR'}, "图片 API 地址不能为空")
                 return {'CANCELLED'}
 
         # 渲染参考底图
@@ -2632,9 +2665,9 @@ class OBJECT_OT_AI_Copy_Errors(Operator):
         lines = [
             "AI 渲染图/视频生成器 - 失败详情",
             "时间: " + time.strftime('%Y-%m-%d %H:%M:%S'),
-            "平台: " + props.platform,
-            "网站: " + props.platform_url,
-            "API URL: " + props.api_url,
+            "图片平台: " + props.image_platform,
+            "图片网站: " + props.image_platform_url,
+            "图片 API URL: " + props.image_api_url,
             "模型: " + props.selected_image_model_id or "(未选)",
             "",
         ]
@@ -2715,17 +2748,17 @@ class OBJECT_OT_AI_Fetch_Video_Models(Operator):
 
     def execute(self, context):
         props = context.scene.ai_gen_props
-        if not props.platform_url.strip():
-            self.report({'ERROR'}, "请先填写网站地址 / ComfyUI 地址")
+        if not props.video_platform_url.strip():
+            self.report({'ERROR'}, "请先填写视频网站地址 / ComfyUI 地址")
             return {'CANCELLED'}
-        if props.platform == "comfyui":
+        if props.video_platform == "comfyui":
             # ComfyUI：从本地服务拉取 checkpoint 作为可选视频模型（工作流也可自带模型）
-            models, err = fetch_models_from_api(props.platform_url, "", platform="comfyui")
+            models, err = fetch_models_from_api(props.video_platform_url, "", platform="comfyui")
         else:
             if not props.api_token.strip():
                 self.report({'ERROR'}, "请先填写 API Token")
                 return {'CANCELLED'}
-            models, err = fetch_models_from_api(props.platform_url, props.api_token, platform=props.platform)
+            models, err = fetch_models_from_api(props.video_platform_url, props.api_token, platform=props.video_platform)
         if err:
             self.report({'ERROR'}, "获取失败: " + err)
             props.video_models_fetch_status = "X " + err[:60]
@@ -2773,7 +2806,7 @@ class OBJECT_OT_AI_Apply_Video_Model(Operator):
         if not mid:
             self.report({'WARNING'}, "未选择视频模型")
             return {'CANCELLED'}
-        props.video_api_url = build_video_api_url(props.platform_url, mid)
+        props.video_api_url = build_video_api_url(props.video_platform_url, mid)
         props.video_model_id_manual = mid
         self.report({'INFO'}, "已应用视频模型: " + mid)
         return {'FINISHED'}
@@ -2802,15 +2835,15 @@ class OBJECT_OT_AI_Generate_Video_Async(Operator):
             else:
                 self.report({'WARNING'}, "已有视频生成任务进行中，请等待完成或点击取消")
                 return {'CANCELLED'}
-        if props.platform == "comfyui":
-            if not props.comfyui_workflow_file.strip() or not os.path.exists(props.comfyui_workflow_file):
-                self.report({'ERROR'}, "请先选择 ComfyUI 视频工作流 JSON 文件")
+        if props.video_platform == "comfyui":
+            if not props.video_comfyui_workflow_file.strip() or not os.path.exists(props.video_comfyui_workflow_file):
+                self.report({'ERROR'}, "请先选择视频 ComfyUI 工作流 JSON 文件")
                 return {'CANCELLED'}
         else:
             # 每次生成都用「网站地址 + 选中的模型」重新拼 URL，避免残留的旧地址（如单数 /v1/video/generations）导致 404
             mid = (props.selected_video_model_id or "").strip()
-            if mid and props.platform_url.strip():
-                props.video_api_url = build_video_api_url(props.platform_url, mid)
+            if mid and props.video_platform_url.strip():
+                props.video_api_url = build_video_api_url(props.video_platform_url, mid)
             if not props.video_api_url.strip() and not props.selected_video_model_id:
                 self.report({'ERROR'}, "视频 API 地址或模型 ID 不能为空")
                 return {'CANCELLED'}
@@ -3023,7 +3056,8 @@ class OBJECT_OT_AI_Copy_Video_Errors(Operator):
         lines = [
             "AI 视频生成器 - 失败详情",
             "时间: " + time.strftime('%Y-%m-%d %H:%M:%S'),
-            "网站: " + props.platform_url,
+            "视频平台: " + props.video_platform,
+            "视频网站: " + props.video_platform_url,
             "视频 API: " + props.video_api_url,
             "模型: " + props.selected_video_model_id or "(未选)",
             "",
@@ -3107,7 +3141,7 @@ class OBJECT_OT_AI_Set_Image_Model(Operator):
         if not mid:
             return {'CANCELLED'}
         props.selected_image_model_id = mid
-        props.api_url = build_api_url_for_model(props.platform_url, mid)
+        props.image_api_url = build_api_url_for_model(props.image_platform_url, mid, platform=props.image_platform)
         self.report({'INFO'}, "图像模型 → " + mid)
         return {'FINISHED'}
 
@@ -3156,7 +3190,7 @@ class OBJECT_OT_AI_Set_Video_Model(Operator):
         if not mid:
             return {'CANCELLED'}
         props.selected_video_model_id = mid
-        props.video_api_url = build_video_api_url(props.platform_url, mid)
+        props.video_api_url = build_video_api_url(props.video_platform_url, mid)
         props.video_model_id_manual = mid
         self.report({'INFO'}, "视频模型 → " + mid)
         return {'FINISHED'}
@@ -3227,17 +3261,17 @@ class VIEW3D_PT_AI_Generate_Panel(Panel):
 
             box.separator()
             col = box.column(align=True)
-            col.label(text="API:", icon='URL')
-            col.prop(props, "platform")
-            if props.platform == "sd_webui":
-                col.prop(props, "api_url", text="接口地址")
+            col.label(text="图片 API:", icon='URL')
+            col.prop(props, "image_platform")
+            if props.image_platform == "sd_webui":
+                col.prop(props, "image_api_url", text="接口地址")
                 col.label(text="本地 SD WebUI 无需 Token", icon='INFO')
-            elif props.platform == "comfyui":
-                col.prop(props, "platform_url", text="ComfyUI 地址")
-                col.prop(props, "comfyui_workflow_file", text="工作流文件")
+            elif props.image_platform == "comfyui":
+                col.prop(props, "image_platform_url", text="ComfyUI 地址")
+                col.prop(props, "image_comfyui_workflow_file", text="图片工作流文件")
                 col.label(text="工作流需用 ComfyUI 右键→保存(API 格式)", icon='INFO')
             else:
-                col.prop(props, "platform_url", text="网站地址")
+                col.prop(props, "image_platform_url", text="网站地址")
                 col.prop(props, "api_token")
                 col.prop(props, "model_filter", text="过滤")
 
@@ -3245,9 +3279,9 @@ class VIEW3D_PT_AI_Generate_Panel(Panel):
             row = box.row(align=True)
             row.prop(props, "selected_image_model_id", text="图像模型")
             row.operator("object.ai_fetch_models", text="获取", icon='FILE_REFRESH')
-            if props.platform == "api":
-                box.prop(props, "api_url", text="API URL")
-            elif props.platform == "comfyui":
+            if props.image_platform == "api":
+                box.prop(props, "image_api_url", text="API URL")
+            elif props.image_platform == "comfyui":
                 col.label(text="（ComfyUI：模型可选，工作流自带模型时留空即可）", icon='INFO')
             # sd_webui 已在上方单独显示 API 地址
 
@@ -3308,15 +3342,15 @@ class VIEW3D_PT_AI_Generate_Panel(Panel):
             col = box.column(align=True)
             # ComfyUI 以工作流文件为准，其他平台才要求选择图像模型
             can_generate = (
-                (props.platform == "comfyui" and props.comfyui_workflow_file.strip() and os.path.exists(props.comfyui_workflow_file))
-                or (props.platform != "comfyui" and _has_selected_image_model(props))
+                (props.image_platform == "comfyui" and props.image_comfyui_workflow_file.strip() and os.path.exists(props.image_comfyui_workflow_file))
+                or (props.image_platform != "comfyui" and _has_selected_image_model(props))
             )
             if props.is_generating or not can_generate:
                 col.enabled = False
             col.operator("object.ai_generate_async", text="▶ 生成图片", icon='RENDER_RESULT')
             if not can_generate:
-                if props.platform == "comfyui":
-                    col.label(text="请先选择 ComfyUI 工作流文件", icon='INFO')
+                if props.image_platform == "comfyui":
+                    col.label(text="请先选择图片 ComfyUI 工作流文件", icon='INFO')
                 else:
                     col.label(text="请先在上方选择图像模型", icon='INFO')
             if props.last_image_path:
@@ -3336,20 +3370,20 @@ class VIEW3D_PT_AI_Generate_Panel(Panel):
                 row = box.row(align=True)
                 row.label(text=props.progress_text_video or "视频就绪", icon='SEQUENCE')
 
-            # --- API 设置（与图片区共享） ---
+            # --- 视频 API 设置（与图片区独立） ---
             box.separator()
             col = box.column(align=True)
-            col.label(text="API:", icon='URL')
-            col.prop(props, "platform")
-            if props.platform == "sd_webui":
-                col.prop(props, "api_url", text="接口地址")
+            col.label(text="视频 API:", icon='URL')
+            col.prop(props, "video_platform")
+            if props.video_platform == "sd_webui":
+                col.prop(props, "video_api_url", text="接口地址")
                 col.label(text="本地 SD WebUI 无需 Token", icon='INFO')
-            elif props.platform == "comfyui":
-                col.prop(props, "platform_url", text="ComfyUI 地址")
-                col.prop(props, "comfyui_workflow_file", text="视频工作流文件")
+            elif props.video_platform == "comfyui":
+                col.prop(props, "video_platform_url", text="ComfyUI 地址")
+                col.prop(props, "video_comfyui_workflow_file", text="视频工作流文件")
                 col.label(text="工作流用 ComfyUI 右键→保存(API 格式)，需含 {prompt} 占位符", icon='INFO')
             else:
-                col.prop(props, "platform_url", text="网站地址")
+                col.prop(props, "video_platform_url", text="网站地址")
                 col.prop(props, "api_token")
                 col.prop(props, "model_filter", text="过滤")
 
@@ -3364,7 +3398,7 @@ class VIEW3D_PT_AI_Generate_Panel(Panel):
             col.label(text="参数:", icon='PREVIEW_RANGE')
             row = col.row(align=True)
             row.prop(props, "video_duration", text="时长(秒)")
-            if props.platform != "comfyui":
+            if props.video_platform != "comfyui":
                 col.prop(props, "use_ref_image", text="使用渲染参考图(图生视频)")
                 col.prop(props, "ref_image_url", text="参考图网络地址(可选)")
                 col.prop(props, "use_style_ref", text="使用风格参考图")
@@ -3389,11 +3423,11 @@ class VIEW3D_PT_AI_Generate_Panel(Panel):
                     col.label(text="将以 base64 形式随 JSON 上传，作为镜头运动参考", icon='FILE_MOVIE')
                 else:
                     col.label(text="留空则用镜头动画；选本地 mp4 直接当参考", icon='INFO')
-                if props.platform != "comfyui":
+                if props.video_platform != "comfyui":
                     col.prop(props, "ref_video_url", text="参考视频网络地址(可选)")
 
             # 风格参考图（视频也支持，与图片区共享同一张图）
-            if props.platform != "comfyui":
+            if props.video_platform != "comfyui":
                 box.separator()
                 col = box.column(align=True)
                 row = col.row(align=True)
@@ -3423,9 +3457,9 @@ class VIEW3D_PT_AI_Generate_Panel(Panel):
                 col.operator("object.ai_cancel_video", text="✕ 取消 / 重置", icon='PAUSE')
             else:
                 block_reason = None
-                if props.platform == "comfyui":
-                    if not props.comfyui_workflow_file.strip():
-                        block_reason = "请先在上方选择 ComfyUI 视频工作流文件"
+                if props.video_platform == "comfyui":
+                    if not props.video_comfyui_workflow_file.strip():
+                        block_reason = "请先在上方选择视频 ComfyUI 工作流文件"
                 elif not _has_selected_video_model(props):
                     block_reason = "请先在上方选择视频模型"
                 if props.is_generating_video or block_reason:
